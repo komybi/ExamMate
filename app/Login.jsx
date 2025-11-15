@@ -1,9 +1,80 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, Alert } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Login({ navigation }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    // Validation
+    if (!email || !password) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      Alert.alert("Error", "Please enter a valid email address");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Get users from storage
+      const existingUsers = await AsyncStorage.getItem('users');
+      const users = existingUsers ? JSON.parse(existingUsers) : [];
+
+      // Find user
+      const user = users.find(u => 
+        u.email === email.toLowerCase().trim() && u.password === password
+      );
+
+      if (user) {
+        // Update last login
+        user.lastLogin = new Date().toISOString();
+        await AsyncStorage.setItem('users', JSON.stringify(users));
+        
+        // Store current session
+        await AsyncStorage.setItem('currentUser', JSON.stringify(user));
+
+        Alert.alert("Success", "Login successful!", [
+          { text: "OK", onPress: () => navigation.navigate("Home") }
+        ]);
+      } else {
+        Alert.alert("Error", "Invalid email or password");
+      }
+
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert("Error", "Failed to login. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Check if user is already logged in (optional)
+  React.useEffect(() => {
+    checkExistingSession();
+  }, []);
+
+  const checkExistingSession = async () => {
+    try {
+      const currentUser = await AsyncStorage.getItem('currentUser');
+      if (currentUser) {
+        // Auto-navigate to home if already logged in
+        navigation.navigate("Home");
+      }
+    } catch (error) {
+      console.error('Session check error:', error);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -18,6 +89,8 @@ export default function Login({ navigation }) {
           placeholderTextColor="#9CA3AF"
           value={email}
           onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
         />
 
         {/* Password Input */}
@@ -32,13 +105,17 @@ export default function Login({ navigation }) {
 
         {/* Login Button */}
         <Pressable
-          onPress={() => navigation.navigate("Home")}
+          onPress={handleLogin}
           style={({ pressed }) => [
             styles.button,
-            pressed && styles.buttonPressed
+            pressed && styles.buttonPressed,
+            loading && styles.buttonDisabled
           ]}
+          disabled={loading}
         >
-          <Text style={styles.buttonText}>Sign In</Text>
+          <Text style={styles.buttonText}>
+            {loading ? "Signing In..." : "Sign In"}
+          </Text>
         </Pressable>
 
         {/* Forgot Password */}
@@ -64,15 +141,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#dbeafe", // from-blue-100
-    paddingHorizontal: 24, // px-6
+    backgroundColor: "#dbeafe",
+    paddingHorizontal: 24,
   },
   card: {
-    backgroundColor: "white", // bg-white
-    width: "100%", // w-full
-    maxWidth: 448, // max-w-md (448px)
-    borderRadius: 16, // rounded-2xl
-    shadowColor: "#000", // shadow-2xl
+    backgroundColor: "white",
+    width: "100%",
+    maxWidth: 448,
+    borderRadius: 16,
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 4,
@@ -80,32 +157,32 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
-    padding: 32, // p-8
+    padding: 32,
   },
   title: {
-    fontSize: 36, // text-4xl
-    fontWeight: "800", // font-extrabold
-    textAlign: "center", // text-center
-    color: "#1d4ed8", // text-blue-700
-    marginBottom: 24, // mb-6
+    fontSize: 36,
+    fontWeight: "800",
+    textAlign: "center",
+    color: "#1d4ed8",
+    marginBottom: 24,
   },
   subtitle: {
-    color: "#6b7280", // text-gray-600
-    textAlign: "center", // text-center
-    marginBottom: 32, // mb-8
+    color: "#6b7280",
+    textAlign: "center",
+    marginBottom: 32,
     fontSize: 16,
   },
   input: {
-    width: "100%", // w-full
-    borderWidth: 1, // border
-    borderColor: "#d1d5db", // border-gray-300
-    borderRadius: 12, // rounded-xl
-    paddingHorizontal: 16, // px-4
-    paddingVertical: 12, // py-3
-    marginBottom: 16, // mb-4
-    fontSize: 16, // text-base
-    backgroundColor: "#f9fafb", // bg-gray-50
-    shadowColor: "#000", // shadow-sm
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    fontSize: 16,
+    backgroundColor: "#f9fafb",
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 1,
@@ -115,11 +192,11 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   button: {
-    width: "100%", // w-full
-    backgroundColor: "#2563eb", // bg-blue-600
-    borderRadius: 12, // rounded-xl
-    paddingVertical: 12, // py-3
-    shadowColor: "#000", // shadow-lg
+    width: "100%",
+    backgroundColor: "#2563eb",
+    borderRadius: 12,
+    paddingVertical: 12,
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -129,29 +206,32 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   buttonPressed: {
-    backgroundColor: "#1d4ed8", // active:bg-blue-700
+    backgroundColor: "#1d4ed8",
+  },
+  buttonDisabled: {
+    backgroundColor: "#93c5fd",
   },
   buttonText: {
-    textAlign: "center", // text-center
-    color: "white", // text-white
-    fontWeight: "600", // font-semibold
-    fontSize: 18, // text-lg
-    letterSpacing: 0.5, // tracking-wide
+    textAlign: "center",
+    color: "white",
+    fontWeight: "600",
+    fontSize: 18,
+    letterSpacing: 0.5,
   },
   forgotPassword: {
-    color: "#2563eb", // text-blue-600
-    marginTop: 16, // mt-4
-    fontSize: 14, // text-sm
-    textAlign: "center", // text-center
+    color: "#2563eb",
+    marginTop: 16,
+    fontSize: 14,
+    textAlign: "center",
   },
   signupText: {
-    color: "#6b7280", // text-gray-600
-    marginTop: 24, // mt-6
-    textAlign: "center", // text-center
+    color: "#6b7280",
+    marginTop: 24,
+    textAlign: "center",
     fontSize: 16,
   },
   signupLink: {
-    color: "#1d4ed8", // text-blue-700
-    fontWeight: "600", // font-semibold
+    color: "#1d4ed8",
+    fontWeight: "600",
   },
 });

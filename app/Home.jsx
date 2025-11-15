@@ -1,3 +1,4 @@
+// app/screens/StudyPlannerScreen.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -8,557 +9,1117 @@ import {
   Alert,
   Modal,
   TextInput,
-  Animated,
+  Platform,
+  ActivityIndicator,
   Dimensions
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width, height } = Dimensions.get('window');
 
-export default function Home({ navigation }) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+// Enhanced AI Service Integration
+const AIService = {
+  openai: null,
+  apiKey: null,
+
+  initialize(apiKey) {
+    this.apiKey = apiKey;
+    console.log('AI Service Initialized');
+  },
+
+  async processContent(content, subjectName, action) {
+    console.log(`AI Processing: ${action} for ${subjectName}`);
+    
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    return this.generateEnhancedResponse(content, subjectName, action);
+  },
+
+  async callRealAI(content, subjectName, action) {
+    if (!this.apiKey) {
+      return this.generateEnhancedResponse(content, subjectName, action);
+    }
+
+    try {
+      const response = await fetch('https://your-backend-service.com/ai/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content,
+          subjectName,
+          action,
+          apiKey: this.apiKey
+        })
+      });
+
+      if (!response.ok) throw new Error('AI service unavailable');
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Real AI service error:', error);
+      return this.generateEnhancedResponse(content, subjectName, action);
+    }
+  },
+
+  generateEnhancedResponse(content, subjectName, action) {
+    const baseContent = content || `Study materials for ${subjectName}`;
+    
+    const responses = {
+      quiz: {
+        questions: [
+          {
+            id: 1,
+            question: `What is the primary focus of ${subjectName} based on your study materials?`,
+            options: [
+              `Understanding core ${subjectName} principles and foundations`,
+              `Memorizing ${subjectName} formulas and equations`, 
+              `Learning historical context of ${subjectName}`,
+              `Focusing on advanced ${subjectName} applications only`
+            ],
+            correctAnswer: 0,
+            explanation: `The materials emphasize building strong foundational knowledge in ${subjectName} before advancing to complex topics.`
+          },
+          {
+            id: 2,
+            question: `Which study approach would be most effective for mastering ${subjectName}?`,
+            options: [
+              'Active recall and spaced repetition',
+              'Passive reading and highlighting',
+              'Cramming before exams',
+              'Relying solely on lecture notes'
+            ],
+            correctAnswer: 0,
+            explanation: 'Research shows active learning techniques significantly improve long-term retention and understanding.'
+          },
+          {
+            id: 3,
+            question: `What key concept from ${subjectName} should you master first?`,
+            options: [
+              'Fundamental principles and basic concepts',
+              'Advanced applications and complex theories',
+              'Historical development and context',
+              'Memorization of all technical terms'
+            ],
+            correctAnswer: 0,
+            explanation: 'Mastering fundamentals creates a solid foundation for understanding more advanced topics.'
+          }
+        ],
+        difficulty: 'intermediate',
+        estimatedTime: '15-20 minutes',
+        totalQuestions: 3
+      },
+
+      summary: {
+        summary: `**${subjectName} Study Summary**\n\nThis comprehensive overview covers the essential concepts and principles you need to master ${subjectName}. The material focuses on building a strong foundation through understanding core principles, key definitions, and practical applications.\n\n${baseContent}`,
+        
+        keyPoints: [
+          `Core principles and fundamental concepts of ${subjectName}`,
+          'Important terminology and definitions to remember',
+          'Practical applications and real-world examples',
+          'Common challenges and effective solutions',
+          'Key relationships between different concepts'
+        ],
+        
+        studyRecommendations: [
+          'Start with basic concepts before moving to advanced topics',
+          'Create visual aids like mind maps and diagrams',
+          'Practice regularly with real-world examples',
+          'Use active recall techniques for better retention',
+          'Review material periodically using spaced repetition'
+        ],
+        
+        difficultyLevel: 'Beginner to Intermediate',
+        estimatedStudyTime: '2-3 hours for comprehensive understanding',
+        priorityTopics: ['Basic Principles', 'Key Definitions', 'Fundamental Applications']
+      },
+
+      flashcards: {
+        cards: [
+          {
+            id: 1,
+            front: `What is the main goal when studying ${subjectName}?`,
+            back: `To understand fundamental principles and develop problem-solving skills that can be applied to real-world situations in ${subjectName}.`
+          },
+          {
+            id: 2,
+            front: 'Most effective study technique for long-term retention?',
+            back: 'Active recall combined with spaced repetition - testing yourself regularly over increasing time intervals.'
+          },
+          {
+            id: 3,
+            front: `How to approach difficult ${subjectName} concepts?`,
+            back: 'Break them down into smaller parts, understand each component separately, then see how they connect together.'
+          },
+          {
+            id: 4,
+            front: 'What makes a good study session?',
+            back: 'Focused, distraction-free environment with clear objectives, active engagement, and regular self-testing.'
+          }
+        ],
+        totalCards: 4,
+        recommendedUse: 'Review daily for 10-15 minutes'
+      },
+
+      study_plan: {
+        plan: [
+          {
+            day: 'Day 1: Foundation Building',
+            tasks: [
+              `Review basic ${subjectName} concepts and definitions`,
+              'Create summary notes of key principles',
+              'Complete foundational practice exercises',
+              'Identify areas needing more focus'
+            ],
+            duration: '1-2 hours',
+            focus: 'Understanding core concepts'
+          },
+          {
+            day: 'Day 2: Application Practice',
+            tasks: [
+              'Work on practical application problems',
+              'Review and correct previous exercises',
+              'Create flashcards for key terms',
+              'Practice explaining concepts aloud'
+            ],
+            duration: '1.5-2 hours',
+            focus: 'Applying knowledge'
+          },
+          {
+            day: 'Day 3: Mastery & Review',
+            tasks: [
+              'Comprehensive review of all material',
+              'Take practice test or quiz',
+              'Focus on weak areas identified',
+              'Final summary and concept mapping'
+            ],
+            duration: '1-2 hours',
+            focus: 'Reinforcement and assessment'
+          }
+        ],
+        totalDuration: '3 days',
+        dailyStudyTime: '1-2 hours per day',
+        resources: ['Textbook materials', 'Practice problems', 'Online resources', 'Flashcards'],
+        tips: [
+          'Take regular breaks during study sessions',
+          'Stay consistent with your schedule',
+          'Focus on understanding rather than memorization',
+          'Test yourself frequently'
+        ]
+      },
+
+      qa: {
+        answer: `Based on the ${subjectName} content you provided, the key concepts involve understanding fundamental principles that serve as building blocks for more advanced topics. The material emphasizes developing a strong foundation through practical application and regular practice.\n\n${content ? `Regarding your specific question about the content, the materials suggest focusing on core principles first, then gradually building up to more complex applications.` : 'I recommend starting with the basic concepts and ensuring you have a solid understanding before moving to advanced topics.'}`,
+        confidence: 'High',
+        relatedConcepts: [
+          'Fundamental Principles',
+          'Core Concepts',
+          'Practical Applications',
+          'Problem-Solving Techniques'
+        ],
+        followUpQuestions: [
+          'How can I apply these concepts in practical scenarios?',
+          'What are the most common mistakes to avoid?',
+          'How do I know when I have mastered the basics?',
+          'What resources would help me practice effectively?'
+        ],
+        studyTips: [
+          'Create a concept map to visualize relationships',
+          'Practice with real-world examples',
+          'Review regularly using spaced repetition',
+          'Teach the concepts to someone else'
+        ]
+      }
+    };
+
+    return responses[action] || responses.summary;
+  }
+};
+
+export default function StudyPlannerScreen({ navigation }) {
+  // Existing states
   const [subjects, setSubjects] = useState([]);
   const [studyPlans, setStudyPlans] = useState([]);
-  const [quizzes, setQuizzes] = useState([]);
-  const [resources, setResources] = useState([]);
   const [showAddSubject, setShowAddSubject] = useState(false);
-  const [newSubject, setNewSubject] = useState('');
-  const [newStudyPlan, setNewStudyPlan] = useState({ title: '', date: '', time: '' });
-  const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [sidebarAnim] = useState(new Animated.Value(-280));
+  const [newSubject, setNewSubject] = useState({ name: '', topic: '', file: null });
+  const [newStudyPlan, setNewStudyPlan] = useState({ 
+    title: '', 
+    date: new Date(), 
+    time: new Date(),
+    showDatePicker: false,
+    showTimePicker: false 
+  });
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [processingAI, setProcessingAI] = useState(false);
+  const [aiAction, setAiAction] = useState('');
+  const [showProfile, setShowProfile] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [expandedSubject, setExpandedSubject] = useState(null);
 
-  // Sample initial data
+  // New profile states
+  const [userEmail, setUserEmail] = useState('');
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
   useEffect(() => {
-    loadInitialData();
+    loadData();
+    initializeAI();
+    loadUserData();
   }, []);
 
-  const loadInitialData = async () => {
-    const defaultSubjects = ['Mathematics', 'Physics', 'Chemistry'];
-    const defaultQuizzes = [
-      { id: 1, title: 'Math Quiz 1', score: 85, total: 100 },
-      { id: 2, title: 'Physics Quiz 1', score: 72, total: 100 }
-    ];
-    const defaultStudyPlans = [
-      { id: 1, title: 'Algebra Revision', date: '2024-01-15', time: '14:00' },
-      { id: 2, title: 'Physics Lab Report', date: '2024-01-16', time: '16:00' }
-    ];
-    
-    setSubjects(defaultSubjects);
-    setQuizzes(defaultQuizzes);
-    setStudyPlans(defaultStudyPlans);
-  };
-
-  // Sidebar Animation
-  const toggleSidebar = () => {
-    if (sidebarVisible) {
-      Animated.timing(sidebarAnim, {
-        toValue: -280,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => setSidebarVisible(false));
-    } else {
-      setSidebarVisible(true);
-      Animated.timing(sidebarAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+  const loadUserData = async () => {
+    try {
+      const savedEmail = await AsyncStorage.getItem('user_email');
+      if (savedEmail) {
+        setUserEmail(savedEmail);
+      } else {
+        // For demo purposes, set a default email
+        // In a real app, this would come from your authentication system
+        const demoEmail = 'student@university.edu';
+        setUserEmail(demoEmail);
+        await AsyncStorage.setItem('user_email', demoEmail);
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
     }
   };
 
-  const handleNavItemPress = (tab) => {
-    setActiveTab(tab);
-    toggleSidebar();
+  const initializeAI = async () => {
+    try {
+      const savedApiKey = await AsyncStorage.getItem('ai_api_key');
+      if (savedApiKey) {
+        setApiKey(savedApiKey);
+        AIService.initialize(savedApiKey);
+      }
+    } catch (error) {
+      console.error('Error initializing AI:', error);
+    }
   };
 
-  // B. Study Planner Functions
-  const addSubject = () => {
-    if (newSubject.trim()) {
-      setSubjects([...subjects, newSubject.trim()]);
-      setNewSubject('');
+  const loadData = async () => {
+    try {
+      const subjectsData = await AsyncStorage.getItem('subjects');
+      const plansData = await AsyncStorage.getItem('studyPlans');
+      
+      if (subjectsData) {
+        setSubjects(JSON.parse(subjectsData));
+      }
+      if (plansData) setStudyPlans(JSON.parse(plansData));
+    } catch (error) {
+      console.error('Error loading data:', error);
+      Alert.alert('Error', 'Failed to load saved data');
+    }
+  };
+
+  const saveData = async (key, data) => {
+    try {
+      await AsyncStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.error('Error saving data:', error);
+      Alert.alert('Error', 'Failed to save data');
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters long');
+      return;
+    }
+
+    try {
+      // In a real app, you would verify the current password with your backend
+      // For demo purposes, we'll simulate a successful password change
+      
+      // Save new password (in a real app, this would be hashed and sent to backend)
+      await AsyncStorage.setItem('user_password', newPassword);
+      
+      Alert.alert('Success', 'Password changed successfully!');
+      setShowChangePassword(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      console.error('Error changing password:', error);
+      Alert.alert('Error', 'Failed to change password');
+    }
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Clear sensitive data (keep subjects and study plans)
+              await AsyncStorage.multiRemove(['ai_api_key', 'user_password']);
+              
+              // In a real app, you would navigate to login screen
+              // navigation.replace('Login');
+              
+              Alert.alert('Logged Out', 'You have been logged out successfully.');
+              setShowProfile(false);
+            } catch (error) {
+              console.error('Error during logout:', error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const pickFile = async () => {
+    try {
+      setUploading(true);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+      
+      if (result.type === 'success') {
+        setSelectedFile(result);
+        setNewSubject(prev => ({ ...prev, file: result }));
+      } else if (result.type === 'cancel') {
+        // User cancelled, do nothing
+      }
+    } catch (err) {
+      console.error('File pick error:', err);
+      Alert.alert('Error', 'Failed to select file');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const addSubject = async () => {
+    if (!newSubject.name.trim()) {
+      Alert.alert('Error', 'Please enter a subject name');
+      return;
+    }
+
+    const subjectData = {
+      id: Date.now().toString(),
+      name: newSubject.name.trim(),
+      topic: newSubject.topic.trim(),
+      file: newSubject.file,
+      createdAt: new Date().toISOString(),
+      hasContent: true,
+      quizzes: [],
+      summaries: [],
+      flashcards: [],
+      studyPlans: [],
+      qaHistory: []
+    };
+
+    try {
+      const updatedSubjects = [...subjects, subjectData];
+      setSubjects(updatedSubjects);
+      await saveData('subjects', updatedSubjects);
+      
+      setNewSubject({ name: '', topic: '', file: null });
+      setSelectedFile(null);
       setShowAddSubject(false);
-      Alert.alert('Success', 'Subject added successfully!');
+      
+      Alert.alert('✅ Success', 'Subject added successfully!');
+      
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add subject');
     }
+  };
+
+  const generateAIContent = async (subject, action) => {
+    try {
+      setProcessingAI(true);
+      setAiAction(action);
+      
+      const content = subject.file ? `File: ${subject.file.name}\nTopic: ${subject.topic}` : subject.topic;
+      const aiResult = await AIService.processContent(content, subject.name, action);
+      
+      const updatedSubjects = subjects.map(sub => {
+        if (sub.id === subject.id) {
+          const update = { ...sub };
+          switch (action) {
+            case 'quiz':
+              update.quizzes = [...(sub.quizzes || []), { ...aiResult, id: Date.now().toString(), createdAt: new Date().toISOString() }];
+              break;
+            case 'summary':
+              update.summaries = [...(sub.summaries || []), { ...aiResult, id: Date.now().toString(), createdAt: new Date().toISOString() }];
+              break;
+            case 'flashcards':
+              update.flashcards = [...(sub.flashcards || []), { ...aiResult, id: Date.now().toString(), createdAt: new Date().toISOString() }];
+              break;
+            case 'study_plan':
+              update.studyPlans = [...(sub.studyPlans || []), { ...aiResult, id: Date.now().toString(), createdAt: new Date().toISOString() }];
+              break;
+          }
+          return update;
+        }
+        return sub;
+      });
+      
+      setSubjects(updatedSubjects);
+      await saveData('subjects', updatedSubjects);
+      
+      Alert.alert(
+        '✅ Success!', 
+        `AI has generated your ${getActionDisplayName(action)} for ${subject.name}`,
+        [{ text: 'Awesome!', onPress: () => {} }]
+      );
+      
+    } catch (error) {
+      console.error('AI Generation error:', error);
+      Alert.alert('Error', 'Failed to generate content. Please try again.');
+    } finally {
+      setProcessingAI(false);
+      setAiAction('');
+    }
+  };
+
+  const getActionDisplayName = (action) => {
+    const names = {
+      quiz: 'quiz',
+      summary: 'summary',
+      flashcards: 'flashcards',
+      study_plan: 'study plan',
+      qa: 'answer'
+    };
+    return names[action] || 'content';
+  };
+
+  // Individual AI generation functions
+  const generateQuiz = (subject) => {
+    generateAIContent(subject, 'quiz');
+  };
+
+  const generateSummary = (subject) => {
+    generateAIContent(subject, 'summary');
+  };
+
+  const generateFlashcards = (subject) => {
+    generateAIContent(subject, 'flashcards');
+  };
+
+  const generateStudyPlan = (subject) => {
+    generateAIContent(subject, 'study_plan');
+  };
+
+  const toggleExpandSubject = (subjectId) => {
+    setExpandedSubject(expandedSubject === subjectId ? null : subjectId);
+  };
+
+  const getFileInfo = (subject) => {
+    if (subject.file) {
+      return `📎 ${subject.file.name}`;
+    }
+    if (subject.topic) {
+      return `📝 ${subject.topic.substring(0, 40)}${subject.topic.length > 40 ? '...' : ''}`;
+    }
+    return '📚 No content added';
+  };
+
+  const getAIContentStats = (subject) => {
+    return {
+      quizzes: subject.quizzes?.length || 0,
+      summaries: subject.summaries?.length || 0,
+      flashcards: subject.flashcards?.length || 0,
+      studyPlans: subject.studyPlans?.length || 0,
+      qa: subject.qaHistory?.length || 0
+    };
+  };
+
+  const onDateChange = (event, selectedDate) => {
+    setNewStudyPlan(prev => ({
+      ...prev,
+      showDatePicker: Platform.OS === 'ios',
+      date: selectedDate || prev.date
+    }));
+  };
+
+  const onTimeChange = (event, selectedTime) => {
+    setNewStudyPlan(prev => ({
+      ...prev,
+      showTimePicker: Platform.OS === 'ios',
+      time: selectedTime || prev.time
+    }));
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
   };
 
   const createStudyPlan = () => {
-    if (newStudyPlan.title && newStudyPlan.date) {
-      setStudyPlans([...studyPlans, { ...newStudyPlan, id: Date.now() }]);
-      setNewStudyPlan({ title: '', date: '', time: '' });
-      Alert.alert('Success', 'Study plan created!');
+    if (!newStudyPlan.title.trim()) {
+      Alert.alert('Error', 'Please enter a study topic');
+      return;
     }
+
+    const plan = { 
+      ...newStudyPlan, 
+      id: Date.now().toString(),
+      date: formatDate(newStudyPlan.date),
+      time: formatTime(newStudyPlan.time),
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedPlans = [...studyPlans, plan];
+    setStudyPlans(updatedPlans);
+    saveData('studyPlans', updatedPlans);
+    
+    setNewStudyPlan({ 
+      title: '', 
+      date: new Date(), 
+      time: new Date(),
+      showDatePicker: false,
+      showTimePicker: false 
+    });
+    
+    Alert.alert('✅ Success', 'Study plan created successfully!');
   };
 
-  // C. Quiz Functions
-  const takeQuiz = (subject) => {
-    Alert.alert('Quiz Started', `Starting ${subject} quiz`);
-    // Navigate to quiz screen or show quiz modal
-  };
-
-  // D. Progress Tracking
-  const getTotalStudyHours = () => {
-    return studyPlans.length * 2;
-  };
-
-  const getAverageScore = () => {
-    if (quizzes.length === 0) return 0;
-    const total = quizzes.reduce((sum, quiz) => sum + quiz.score, 0);
-    return Math.round(total / quizzes.length);
-  };
-
-  const getCompletedTopics = () => {
-    return Math.floor(subjects.length * 0.7); // Mock data
-  };
-
-  // Navigation items with icons
-  const navItems = [
-    { key: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-    { key: 'planner', label: 'Study Planner', icon: 'schedule' },
-    { key: 'quizzes', label: 'Quizzes', icon: 'quiz' },
-    { key: 'progress', label: 'Progress', icon: 'trending-up' },
-    { key: 'resources', label: 'Resources', icon: 'library-books' },
-    { key: 'profile', label: 'Profile', icon: 'person' },
-  ];
-
-  // Render different sections based on active tab
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return renderDashboard();
-      case 'planner':
-        return renderStudyPlanner();
-      case 'quizzes':
-        return renderQuizzes();
-      case 'progress':
-        return renderProgress();
-      case 'resources':
-        return renderResources();
-      case 'profile':
-        return renderProfile();
-      default:
-        return renderDashboard();
-    }
-  };
-
-  const renderDashboard = () => (
-    <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-      {/* Welcome Section */}
-      <View style={styles.welcomeSection}>
-        <View style={styles.welcomeText}>
-          <Text style={styles.welcomeTitle}>Welcome back, John! 👋</Text>
-          <Text style={styles.welcomeSubtitle}>Ready to continue your learning journey?</Text>
-        </View>
-        <View style={styles.avatar}>
-          <Icon name="person" size={32} color="white" />
-        </View>
-      </View>
-
-      {/* Quick Stats */}
-      <View style={styles.quickStats}>
-        <View style={styles.quickStatCard}>
-          <Icon name="access-time" size={24} color="#2563eb" />
-          <Text style={styles.quickStatNumber}>{getTotalStudyHours()}h</Text>
-          <Text style={styles.quickStatLabel}>Study Time</Text>
-        </View>
-        <View style={styles.quickStatCard}>
-          <Icon name="star" size={24} color="#10b981" />
-          <Text style={styles.quickStatNumber}>{getAverageScore()}%</Text>
-          <Text style={styles.quickStatLabel}>Avg Score</Text>
-        </View>
-        <View style={styles.quickStatCard}>
-          <Icon name="check-circle" size={24} color="#f59e0b" />
-          <Text style={styles.quickStatNumber}>{getCompletedTopics()}</Text>
-          <Text style={styles.quickStatLabel}>Topics Done</Text>
-        </View>
-      </View>
-
-      {/* Today's Focus */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🎯 Today's Focus</Text>
-        <View style={styles.focusCard}>
-          <Icon name="target" size={32} color="#8b5cf6" />
-          <View style={styles.focusContent}>
-            <Text style={styles.focusTitle}>Complete Algebra Chapter</Text>
-            <Text style={styles.focusSubtitle}>2 hours planned • Due tomorrow</Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: '60%' }]} />
-            </View>
-            <Text style={styles.progressText}>60% completed</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Upcoming Sessions */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>📅 Upcoming Sessions</Text>
-          <TouchableOpacity>
-            <Text style={styles.seeAllText}>See all</Text>
-          </TouchableOpacity>
-        </View>
-        {studyPlans.slice(0, 2).map(plan => (
-          <View key={plan.id} style={styles.sessionCard}>
-            <View style={styles.sessionIcon}>
-              <Icon name="schedule" size={20} color="#2563eb" />
-            </View>
-            <View style={styles.sessionInfo}>
-              <Text style={styles.sessionTitle}>{plan.title}</Text>
-              <Text style={styles.sessionTime}>{plan.date} • {plan.time}</Text>
-            </View>
-            <TouchableOpacity style={styles.sessionButton}>
-              <Text style={styles.sessionButtonText}>Start</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </View>
-
-      {/* Recent Performance */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>📊 Recent Performance</Text>
-        <View style={styles.performanceCard}>
-          <View style={styles.performanceItem}>
-            <Text style={styles.performanceLabel}>Mathematics</Text>
-            <View style={styles.performanceBar}>
-              <View style={[styles.performanceFill, { width: '85%', backgroundColor: '#10b981' }]} />
-            </View>
-            <Text style={styles.performanceValue}>85%</Text>
-          </View>
-          <View style={styles.performanceItem}>
-            <Text style={styles.performanceLabel}>Physics</Text>
-            <View style={styles.performanceBar}>
-              <View style={[styles.performanceFill, { width: '72%', backgroundColor: '#f59e0b' }]} />
-            </View>
-            <Text style={styles.performanceValue}>72%</Text>
-          </View>
-          <View style={styles.performanceItem}>
-            <Text style={styles.performanceLabel}>Chemistry</Text>
-            <View style={styles.performanceBar}>
-              <View style={[styles.performanceFill, { width: '68%', backgroundColor: '#ef4444' }]} />
-            </View>
-            <Text style={styles.performanceValue}>68%</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>⚡ Quick Actions</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickActionCard}>
-            <View style={[styles.actionIcon, { backgroundColor: '#dbeafe' }]}>
-              <Icon name="play-arrow" size={24} color="#2563eb" />
-            </View>
-            <Text style={styles.actionText}>Start Quiz</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionCard}>
-            <View style={[styles.actionIcon, { backgroundColor: '#dcfce7' }]}>
-              <Icon name="add" size={24} color="#10b981" />
-            </View>
-            <Text style={styles.actionText}>Add Plan</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionCard}>
-            <View style={[styles.actionIcon, { backgroundColor: '#fef3c7' }]}>
-              <Icon name="library-books" size={24} color="#f59e0b" />
-            </View>
-            <Text style={styles.actionText}>Resources</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </ScrollView>
-  );
-
-  const renderStudyPlanner = () => (
-    <ScrollView style={styles.content}>
-      <Text style={styles.sectionTitle}>📚 Study Planner</Text>
-      
-      {/* Add Subject */}
-      <TouchableOpacity 
-        style={styles.addButton}
-        onPress={() => setShowAddSubject(true)}
-      >
-        <Icon name="add" size={20} color="white" />
-        <Text style={styles.addButtonText}>Add Subject</Text>
-      </TouchableOpacity>
-
-      {/* Subjects List */}
-      <View style={styles.subjectsContainer}>
-        {subjects.map((subject, index) => (
-          <View key={index} style={styles.subjectCard}>
-            <Icon name="menu-book" size={24} color="#2563eb" />
-            <View style={styles.subjectInfo}>
-              <Text style={styles.subjectName}>{subject}</Text>
-            </View>
+  const renderGeneratedContent = (subject) => {
+    const stats = getAIContentStats(subject);
+    
+    return (
+      <View style={styles.generatedContent}>
+        {/* Summary Section */}
+        {stats.summaries > 0 && (
+          <View style={styles.contentSection}>
+            <Text style={styles.contentSectionTitle}>📋 Summary</Text>
+            <Text style={styles.contentText} numberOfLines={3}>
+              {subject.summaries[subject.summaries.length - 1].summary.replace(/\*\*(.*?)\*\*/g, '$1').substring(0, 150)}...
+            </Text>
             <TouchableOpacity 
-              style={styles.quizSmallButton}
-              onPress={() => takeQuiz(subject)}
+              style={styles.viewContentButton}
+              onPress={() => navigation.navigate('SummaryScreen', {
+                summary: subject.summaries[subject.summaries.length - 1],
+                subjectName: subject.name
+              })}
             >
-              <Text style={styles.quizSmallButtonText}>Take Quiz</Text>
+              <Text style={styles.viewContentButtonText}>Read Full Summary</Text>
             </TouchableOpacity>
           </View>
-        ))}
-      </View>
+        )}
 
-      {/* Calendar View */}
-      <View style={styles.calendarSection}>
-        <Text style={styles.subSectionTitle}>🗓️ Study Calendar</Text>
-        <Calendar
-          style={styles.calendar}
-          markedDates={{
-            [new Date().toISOString().split('T')[0]]: { selected: true, selectedColor: '#2563eb' }
-          }}
-        />
-      </View>
-
-      {/* Add Study Plan */}
-      <View style={styles.addPlanSection}>
-        <Text style={styles.subSectionTitle}>➕ Create Study Plan</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Study topic"
-          value={newStudyPlan.title}
-          onChangeText={(text) => setNewStudyPlan({...newStudyPlan, title: text})}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Date (YYYY-MM-DD)"
-          value={newStudyPlan.date}
-          onChangeText={(text) => setNewStudyPlan({...newStudyPlan, date: text})}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Time"
-          value={newStudyPlan.time}
-          onChangeText={(text) => setNewStudyPlan({...newStudyPlan, time: text})}
-        />
-        <TouchableOpacity style={styles.primaryButton} onPress={createStudyPlan}>
-          <Icon name="add" size={20} color="white" />
-          <Text style={styles.primaryButtonText}>Create Plan</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
-  );
-
-  const renderQuizzes = () => (
-    <ScrollView style={styles.content}>
-      <Text style={styles.sectionTitle}>🧠 Quiz Section</Text>
-      
-      <View style={styles.quizStats}>
-        <Text style={styles.quizStatsText}>Average Score: {getAverageScore()}%</Text>
-        <Text style={styles.quizStatsText}>Quizzes Taken: {quizzes.length}</Text>
-      </View>
-
-      {quizzes.map(quiz => (
-        <View key={quiz.id} style={styles.quizItem}>
-          <Icon name="assignment" size={24} color="#2563eb" />
-          <View style={styles.quizInfo}>
-            <Text style={styles.quizItemTitle}>{quiz.title}</Text>
-            <Text style={styles.quizItemScore}>Score: {quiz.score}%</Text>
+        {/* Quiz Section */}
+        {stats.quizzes > 0 && (
+          <View style={styles.contentSection}>
+            <Text style={styles.contentSectionTitle}>🧠 Quiz</Text>
+            <Text style={styles.contentText}>
+              {subject.quizzes[subject.quizzes.length - 1].questions.length} questions • {subject.quizzes[subject.quizzes.length - 1].estimatedTime}
+            </Text>
+            <TouchableOpacity 
+              style={styles.viewContentButton}
+              onPress={() => navigation.navigate('QuizScreen', {
+                quiz: subject.quizzes[subject.quizzes.length - 1],
+                subjectName: subject.name
+              })}
+            >
+              <Text style={styles.viewContentButtonText}>Take Quiz</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.retakeButton}>
-            <Text style={styles.retakeButtonText}>Retake</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
+        )}
 
-      <TouchableOpacity style={styles.primaryButton}>
-        <Icon name="play-arrow" size={20} color="white" />
-        <Text style={styles.primaryButtonText}>Start New Quiz</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
+        {/* Flashcards Section */}
+        {stats.flashcards > 0 && (
+          <View style={styles.contentSection}>
+            <Text style={styles.contentSectionTitle}>🎴 Flashcards</Text>
+            <Text style={styles.contentText}>
+              {subject.flashcards[subject.flashcards.length - 1].totalCards} cards available
+            </Text>
+            <TouchableOpacity style={styles.viewContentButton}>
+              <Text style={styles.viewContentButtonText}>View Flashcards</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-  const renderProgress = () => (
-    <ScrollView style={styles.content}>
-      <Text style={styles.sectionTitle}>📈 Progress Tracker</Text>
-      
-      <View style={styles.progressCard}>
-        <Icon name="access-time" size={32} color="#2563eb" />
-        <View style={styles.progressText}>
-          <Text style={styles.progressTitle}>Study Hours</Text>
-          <Text style={styles.progressValue}>{getTotalStudyHours()} hours</Text>
-        </View>
+        {/* Study Plan Section */}
+        {stats.studyPlans > 0 && (
+          <View style={styles.contentSection}>
+            <Text style={styles.contentSectionTitle}>📅 Study Plan</Text>
+            <Text style={styles.contentText}>
+              {subject.studyPlans[subject.studyPlans.length - 1].totalDuration} plan
+            </Text>
+            <TouchableOpacity style={styles.viewContentButton}>
+              <Text style={styles.viewContentButtonText}>View Study Plan</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-
-      <View style={styles.progressCard}>
-        <Icon name="school" size={32} color="#10b981" />
-        <View style={styles.progressText}>
-          <Text style={styles.progressTitle}>Subjects Mastered</Text>
-          <Text style={styles.progressValue}>{subjects.length} subjects</Text>
-        </View>
-      </View>
-
-      <View style={styles.progressCard}>
-        <Icon name="bar-chart" size={32} color="#f59e0b" />
-        <View style={styles.progressText}>
-          <Text style={styles.progressTitle}>Quiz Performance</Text>
-          <Text style={styles.progressValue}>{getAverageScore()}% average</Text>
-        </View>
-      </View>
-    </ScrollView>
-  );
-
-  const renderResources = () => (
-    <ScrollView style={styles.content}>
-      <Text style={styles.sectionTitle}>📚 Resource Library</Text>
-      <View style={styles.comingSoonContainer}>
-        <Icon name="cloud-download" size={64} color="#6b7280" />
-        <Text style={styles.comingSoon}>Resource library coming soon...</Text>
-        <Text style={styles.comingSoonSubtitle}>Upload PDFs, videos, and notes</Text>
-      </View>
-    </ScrollView>
-  );
-
-  const renderProfile = () => (
-    <ScrollView style={styles.content}>
-      <Text style={styles.sectionTitle}>👤 Profile</Text>
-      <View style={styles.profileCard}>
-        <View style={styles.avatar}>
-          <Icon name="person" size={40} color="white" />
-        </View>
-        <Text style={styles.userName}>John Doe</Text>
-        <Text style={styles.userEmail}>john.doe@example.com</Text>
-        
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileItem}>
-            <Icon name="school" size={16} color="#6b7280" /> Example University
-          </Text>
-          <Text style={styles.profileItem}>
-            <Icon name="menu-book" size={16} color="#6b7280" /> {subjects.length} Subjects
-          </Text>
-          <Text style={styles.profileItem}>
-            <Icon name="quiz" size={16} color="#6b7280" /> {quizzes.length} Quizzes Taken
-          </Text>
-        </View>
-      </View>
-      
-      <TouchableOpacity 
-        style={styles.logoutButton}
-        onPress={() => navigation.navigate('Login')}
-      >
-        <Icon name="logout" size={20} color="white" />
-        <Text style={styles.logoutButtonText}>Logout</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
-      {/* Header with Hamburger Menu */}
+      {/* Simplified Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={toggleSidebar} style={styles.menuButton}>
-          <View style={styles.menuLine} />
-          <View style={styles.menuLine} />
-          <View style={styles.menuLine} />
+        <Text style={styles.headerTitle}>AI Study Planner</Text>
+        <TouchableOpacity 
+          style={styles.profileButton}
+          onPress={() => setShowProfile(true)}
+        >
+          <MaterialIcons name="person" size={24} color="#374151" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {navItems.find(item => item.key === activeTab)?.label}
-        </Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Icon name="notifications" size={24} color="#374151" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <Icon name="search" size={24} color="#374151" />
-          </TouchableOpacity>
-        </View>
       </View>
-
-      {/* Animated Sidebar */}
-      <Animated.View style={[
-        styles.sidebar,
-        { transform: [{ translateX: sidebarAnim }] }
-      ]}>
-        {/* Sidebar Content */}
-        <View style={styles.sidebarContent}>
-          <View style={styles.sidebarHeader}>
-            <View style={styles.sidebarAvatar}>
-              <Icon name="school" size={32} color="white" />
-            </View>
-            <Text style={styles.sidebarAppTitle}>StudySmart</Text>
-            <Text style={styles.sidebarSubtitle}>Your Learning Companion</Text>
-          </View>
-
-          <View style={styles.navContainer}>
-            {navItems.map((item) => (
-              <TouchableOpacity
-                key={item.key}
-                style={[
-                  styles.navItem,
-                  activeTab === item.key && styles.activeNavItem
-                ]}
-                onPress={() => handleNavItemPress(item.key)}
-              >
-                <Icon 
-                  name={item.icon} 
-                  size={24} 
-                  color={activeTab === item.key ? '#2563eb' : '#9ca3af'} 
-                />
-                <Text style={[
-                  styles.navText,
-                  activeTab === item.key && styles.activeNavText
-                ]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={styles.sidebarFooter}>
-            <View style={styles.userCard}>
-              <View style={styles.userAvatar}>
-                <Icon name="person" size={24} color="white" />
-              </View>
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>John Doe</Text>
-                <Text style={styles.userEmail}>Student</Text>
-              </View>
-            </View>
-            <TouchableOpacity 
-              style={styles.logoutButtonSidebar}
-              onPress={() => navigation.navigate('Login')}
-            >
-              <Icon name="logout" size={20} color="#ef4444" />
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Overlay to close sidebar when clicking outside */}
-        {sidebarVisible && (
-          <TouchableOpacity 
-            style={styles.overlay}
-            onPress={toggleSidebar}
-          />
-        )}
-      </Animated.View>
 
       {/* Main Content */}
-      <View style={styles.mainContent}>
-        {renderContent()}
-      </View>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* AI Processing Overlay */}
+        {processingAI && (
+          <View style={styles.aiProcessingOverlay}>
+            <View style={styles.aiProcessingContent}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={styles.aiProcessingText}>
+                AI is generating your {aiAction}...
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Add Subject Button */}
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => setShowAddSubject(true)}
+        >
+          <MaterialIcons name="add-circle" size={24} color="white" />
+          <Text style={styles.addButtonText}>Add New Subject</Text>
+        </TouchableOpacity>
+
+        {/* Subjects List */}
+        {subjects.length > 0 ? (
+          <View style={styles.subjectsContainer}>
+            <Text style={styles.subSectionTitle}>Your Study Subjects</Text>
+            {subjects.map((subject) => {
+              const stats = getAIContentStats(subject);
+              const isExpanded = expandedSubject === subject.id;
+              
+              return (
+                <View key={subject.id} style={styles.subjectCard}>
+                  <TouchableOpacity 
+                    style={styles.subjectHeader}
+                    onPress={() => toggleExpandSubject(subject.id)}
+                  >
+                    <MaterialIcons name="menu-book" size={22} color="#007AFF" />
+                    <Text style={styles.subjectName}>{subject.name}</Text>
+                    <MaterialIcons 
+                      name={isExpanded ? "expand-less" : "expand-more"} 
+                      size={24} 
+                      color="#666" 
+                    />
+                  </TouchableOpacity>
+                  
+                  {/* File Information */}
+                  <View style={styles.fileSection}>
+                    <MaterialIcons name="description" size={16} color="#007AFF" />
+                    <Text style={styles.fileText}>{getFileInfo(subject)}</Text>
+                  </View>
+                  
+                  {/* AI Stats */}
+                  <View style={styles.aiStats}>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statIcon}>🧠</Text>
+                      <Text style={styles.statText}>{stats.quizzes}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statIcon}>📋</Text>
+                      <Text style={styles.statText}>{stats.summaries}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statIcon}>🎴</Text>
+                      <Text style={styles.statText}>{stats.flashcards}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statIcon}>📅</Text>
+                      <Text style={styles.statText}>{stats.studyPlans}</Text>
+                    </View>
+                  </View>
+                  
+                  {/* AI Generation Buttons */}
+                  <View style={styles.aiGenerationSection}>
+                    <Text style={styles.aiSectionTitle}>Generate AI Content:</Text>
+                    <View style={styles.aiButtonsRow}>
+                      <TouchableOpacity 
+                        style={styles.aiGenButton}
+                        onPress={() => generateQuiz(subject)}
+                      >
+                        <MaterialIcons name="quiz" size={16} color="white" />
+                        <Text style={styles.aiGenButtonText}>Quiz</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.aiGenButton}
+                        onPress={() => generateSummary(subject)}
+                      >
+                        <MaterialIcons name="description" size={16} color="white" />
+                        <Text style={styles.aiGenButtonText}>Summary</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.aiGenButton}
+                        onPress={() => generateFlashcards(subject)}
+                      >
+                        <MaterialIcons name="style" size={16} color="white" />
+                        <Text style={styles.aiGenButtonText}>Cards</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.aiGenButton}
+                        onPress={() => generateStudyPlan(subject)}
+                      >
+                        <MaterialIcons name="schedule" size={16} color="white" />
+                        <Text style={styles.aiGenButtonText}>Plan</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Expanded Content */}
+                  {isExpanded && renderGeneratedContent(subject)}
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <MaterialIcons name="menu-book" size={60} color="#CCCCCC" />
+            <Text style={styles.emptyStateText}>No subjects yet</Text>
+            <Text style={styles.emptyStateSubtext}>
+              Add your first subject and let AI create study materials for you
+            </Text>
+          </View>
+        )}
+
+        {/* Study Plans Section */}
+        <View style={styles.plansSection}>
+          <Text style={styles.subSectionTitle}>📅 Create Study Plan</Text>
+          
+          <TextInput
+            style={styles.input}
+            placeholder="What do you want to study?"
+            value={newStudyPlan.title}
+            onChangeText={(text) => setNewStudyPlan(prev => ({...prev, title: text}))}
+          />
+          
+          <View style={styles.pickerRow}>
+            <TouchableOpacity 
+              style={styles.pickerButton}
+              onPress={() => setNewStudyPlan(prev => ({...prev, showDatePicker: true}))}
+            >
+              <MaterialIcons name="calendar-today" size={18} color="#007AFF" />
+              <Text style={styles.pickerButtonText}>
+                {formatDate(newStudyPlan.date)}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.pickerButton}
+              onPress={() => setNewStudyPlan(prev => ({...prev, showTimePicker: true}))}
+            >
+              <MaterialIcons name="access-time" size={18} color="#007AFF" />
+              <Text style={styles.pickerButtonText}>
+                {formatTime(newStudyPlan.time)}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {newStudyPlan.showDatePicker && (
+            <DateTimePicker
+              value={newStudyPlan.date}
+              mode="date"
+              display="default"
+              onChange={onDateChange}
+            />
+          )}
+
+          {newStudyPlan.showTimePicker && (
+            <DateTimePicker
+              value={newStudyPlan.time}
+              mode="time"
+              display="default"
+              onChange={onTimeChange}
+            />
+          )}
+
+          <TouchableOpacity 
+            style={[
+              styles.primaryButton, 
+              !newStudyPlan.title.trim() && styles.buttonDisabled
+            ]} 
+            onPress={createStudyPlan}
+            disabled={!newStudyPlan.title.trim()}
+          >
+            <MaterialIcons name="schedule" size={20} color="white" />
+            <Text style={styles.primaryButtonText}>Create Study Plan</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Calendar Section */}
+        <View style={styles.calendarSection}>
+          <Text style={styles.subSectionTitle}>🗓️ Study Calendar</Text>
+          <Calendar
+            style={styles.calendar}
+            theme={{
+              backgroundColor: '#ffffff',
+              calendarBackground: '#ffffff',
+              selectedDayBackgroundColor: '#007AFF',
+              selectedDayTextColor: '#ffffff',
+              todayTextColor: '#007AFF',
+              dayTextColor: '#2d4150',
+              textDisabledColor: '#d9e1e8',
+              dotColor: '#007AFF',
+              selectedDotColor: '#ffffff',
+              arrowColor: '#007AFF',
+              monthTextColor: '#2d4150',
+              textDayFontWeight: '300',
+              textMonthFontWeight: 'bold',
+              textDayHeaderFontWeight: '500',
+            }}
+            markedDates={{
+              [new Date().toISOString().split('T')[0]]: { 
+                selected: true, 
+                selectedColor: '#007AFF',
+                selectedTextColor: '#ffffff'
+              }
+            }}
+          />
+        </View>
+      </ScrollView>
 
       {/* Add Subject Modal */}
-      <Modal visible={showAddSubject} animationType="slide" transparent>
+      <Modal 
+        visible={showAddSubject} 
+        animationType="slide" 
+        transparent={true}
+        onRequestClose={() => setShowAddSubject(false)}
+      >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add New Subject</Text>
+            
             <TextInput
               style={styles.input}
-              placeholder="Subject name"
-              value={newSubject}
-              onChangeText={setNewSubject}
+              placeholder="Subject name *"
+              value={newSubject.name}
+              onChangeText={(text) => setNewSubject(prev => ({...prev, name: text}))}
             />
+            
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Topic description or key concepts"
+              value={newSubject.topic}
+              onChangeText={(text) => setNewSubject(prev => ({...prev, topic: text}))}
+              multiline
+              numberOfLines={3}
+            />
+
+            <TouchableOpacity 
+              style={styles.uploadButton}
+              onPress={pickFile}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <MaterialIcons name="attach-file" size={20} color="white" />
+              )}
+              <Text style={styles.uploadButtonText}>
+                {selectedFile ? 'Change File' : 'Attach File (Optional)'}
+              </Text>
+            </TouchableOpacity>
+
+            {selectedFile && (
+              <View style={styles.fileInfo}>
+                <MaterialIcons name="description" size={16} color="#007AFF" />
+                <Text style={styles.fileName}>{selectedFile.name}</Text>
+              </View>
+            )}
+
             <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={styles.secondaryButton}
-                onPress={() => setShowAddSubject(false)}
+                onPress={() => {
+                  setShowAddSubject(false);
+                  setNewSubject({ name: '', topic: '', file: null });
+                  setSelectedFile(null);
+                }}
               >
                 <Text style={styles.secondaryButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.primaryButton} onPress={addSubject}>
+              <TouchableOpacity 
+                style={[
+                  styles.primaryButton, 
+                  !newSubject.name.trim() && styles.buttonDisabled
+                ]} 
+                onPress={addSubject}
+                disabled={!newSubject.name.trim()}
+              >
+                <MaterialIcons name="add" size={20} color="white" />
                 <Text style={styles.primaryButtonText}>Add Subject</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Profile Modal */}
+      <Modal 
+        visible={showProfile} 
+        animationType="slide" 
+        transparent={true}
+        onRequestClose={() => setShowProfile(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>👤 Profile</Text>
+            
+            <View style={styles.profileInfo}>
+              <View style={styles.profileAvatar}>
+                <MaterialIcons name="person" size={40} color="white" />
+              </View>
+              <Text style={styles.profileName}>Student User</Text>
+              <Text style={styles.profileEmail}>{userEmail}</Text>
+            </View>
+
+            <View style={styles.profileStats}>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{subjects.length}</Text>
+                <Text style={styles.statLabel}>Subjects</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>
+                  {subjects.reduce((total, subject) => total + (subject.quizzes?.length || 0), 0)}
+                </Text>
+                <Text style={styles.statLabel}>Quizzes</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>
+                  {subjects.reduce((total, subject) => total + (subject.summaries?.length || 0), 0)}
+                </Text>
+                <Text style={styles.statLabel}>Summaries</Text>
+              </View>
+            </View>
+
+            {/* Profile Actions */}
+            <View style={styles.profileActions}>
+              <TouchableOpacity 
+                style={styles.profileActionButton}
+                onPress={() => setShowChangePassword(true)}
+              >
+                <MaterialIcons name="lock" size={20} color="#007AFF" />
+                <Text style={styles.profileActionText}>Change Password</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.profileActionButton, styles.logoutButton]}
+                onPress={handleLogout}
+              >
+                <MaterialIcons name="logout" size={20} color="#FF3B30" />
+                <Text style={[styles.profileActionText, styles.logoutText]}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.secondaryButton}
+              onPress={() => setShowProfile(false)}
+            >
+              <Text style={styles.secondaryButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal 
+        visible={showChangePassword} 
+        animationType="slide" 
+        transparent={true}
+        onRequestClose={() => setShowChangePassword(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Change Password</Text>
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Current Password"
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              secureTextEntry
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder="New Password"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm New Password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.secondaryButton}
+                onPress={() => {
+                  setShowChangePassword(false);
+                  setCurrentPassword('');
+                  setNewPassword('');
+                  setConfirmPassword('');
+                }}
+              >
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[
+                  styles.primaryButton, 
+                  (!currentPassword || !newPassword || !confirmPassword) && styles.buttonDisabled
+                ]} 
+                onPress={handleChangePassword}
+                disabled={!currentPassword || !newPassword || !confirmPassword}
+              >
+                <MaterialIcons name="lock-reset" size={20} color="white" />
+                <Text style={styles.primaryButtonText}>Change Password</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -571,7 +1132,7 @@ export default function Home({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f8f9fa',
   },
   // Header Styles
   header: {
@@ -588,646 +1149,421 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  menuButton: {
-    padding: 8,
-  },
-  menuLine: {
-    width: 20,
-    height: 2,
-    backgroundColor: '#374151',
-    marginVertical: 2,
-    borderRadius: 2,
-  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1f2937',
   },
-  headerActions: {
-    flexDirection: 'row',
-  },
-  headerButton: {
+  profileButton: {
     padding: 8,
-    marginLeft: 10,
-  },
-  // Sidebar Styles
-  sidebar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    width: 280,
-    zIndex: 1000,
-  },
-  sidebarContent: {
-    flex: 1,
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  sidebarHeader: {
-    backgroundColor: '#2563eb',
-    padding: 25,
-    paddingTop: 60,
-    alignItems: 'center',
-  },
-  sidebarAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 15,
-  },
-  sidebarAppTitle: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  sidebarSubtitle: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-  },
-  navContainer: {
-    flex: 1,
-    paddingVertical: 20,
-  },
-  navItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    marginHorizontal: 10,
-    borderRadius: 12,
-    marginBottom: 5,
-  },
-  activeNavItem: {
-    backgroundColor: '#f3f4f6',
-  },
-  navText: {
-    color: '#6b7280',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 15,
-  },
-  activeNavText: {
-    color: '#2563eb',
-    fontWeight: '600',
-  },
-  sidebarFooter: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-  },
-  userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2563eb',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  logoutButtonSidebar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-  },
-  logoutText: {
-    color: '#ef4444',
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  overlay: {
-    position: 'absolute',
-    left: 280,
-    right: -1000,
-    top: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   // Main Content
-  mainContent: {
-    flex: 1,
-  },
   content: {
     flex: 1,
-    padding: 20,
+    padding: 16,
   },
-  // Dashboard Landing Page Styles
-  welcomeSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  welcomeText: {
-    flex: 1,
-  },
-  welcomeTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 5,
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#2563eb',
-    alignItems: 'center',
+  // AI Processing
+  aiProcessingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
-  },
-  quickStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  quickStatCard: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
     alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    zIndex: 1000,
   },
-  quickStatNumber: {
+  aiProcessingContent: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    margin: 20,
+  },
+  aiProcessingText: {
+    marginTop: 15,
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginVertical: 5,
-  },
-  quickStatLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  section: {
-    marginBottom: 25,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 15,
-  },
-  seeAllText: {
-    color: '#2563eb',
-    fontWeight: '500',
-  },
-  focusCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  focusContent: {
-    flex: 1,
-    marginLeft: 15,
-  },
-  focusTitle: {
-    fontSize: 16,
+    color: '#1a1a1a',
     fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 5,
-  },
-  focusSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 10,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 3,
-    marginBottom: 5,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#10b981',
-    borderRadius: 3,
-  },
-  progressText: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  sessionCard: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  sessionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#dbeafe',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  sessionInfo: {
-    flex: 1,
-  },
-  sessionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  sessionTime: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  sessionButton: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  sessionButtonText: {
-    color: 'white',
-    fontWeight: '500',
-    fontSize: 12,
-  },
-  performanceCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  performanceItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  performanceLabel: {
-    width: 80,
-    fontSize: 14,
-    color: '#374151',
-  },
-  performanceBar: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 4,
-    marginHorizontal: 10,
-  },
-  performanceFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  performanceValue: {
-    width: 40,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1f2937',
-    textAlign: 'right',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  quickActionCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  actionIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#374151',
     textAlign: 'center',
   },
-  // Study Planner Styles
+  // Add Button
   addButton: {
-    backgroundColor: '#10b981',
-    padding: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 15,
+    backgroundColor: '#007AFF',
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   addButtonText: {
     color: 'white',
+    fontSize: 18,
     fontWeight: '600',
-    fontSize: 16,
     marginLeft: 8,
   },
+  // Subjects
   subjectsContainer: {
     marginBottom: 20,
   },
   subjectCard: {
     backgroundColor: 'white',
-    padding: 15,
+    padding: 16,
     borderRadius: 12,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  subjectInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  subjectName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  quizSmallButton: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  quizSmallButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  calendarSection: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 15,
-  },
-  calendar: {
-    borderRadius: 12,
-  },
-  addPlanSection: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
     marginBottom: 12,
-    backgroundColor: '#f9fafb',
-  },
-  primaryButton: {
-    backgroundColor: '#2563eb',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  primaryButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
-    marginLeft: 8,
-  },
-  // Quiz Styles
-  quizStats: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 15,
-  },
-  quizStatsText: {
-    fontSize: 16,
-    color: '#374151',
-    marginBottom: 5,
-  },
-  quizItem: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  quizInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  quizItemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  quizItemScore: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  retakeButton: {
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  retakeButtonText: {
-    color: 'white',
-    fontWeight: '500',
-  },
-  // Progress Styles
-  progressCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 6,
     elevation: 3,
   },
-  progressText: {
-    marginLeft: 15,
+  subjectHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  progressTitle: {
-    fontSize: 16,
+  subjectName: {
+    fontSize: 18,
     fontWeight: '600',
-    color: '#374151',
+    color: '#1a1a1a',
+    marginLeft: 8,
+    flex: 1,
+  },
+  // File Section
+  fileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  fileText: {
+    fontSize: 14,
+    color: '#495057',
+    marginLeft: 8,
+    flex: 1,
+  },
+  // AI Stats
+  aiStats: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statIcon: {
+    fontSize: 14,
     marginBottom: 4,
   },
-  progressValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2563eb',
+  statText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '600',
   },
-  // Resources Styles
-  comingSoonContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
+  // AI Generation Section
+  aiGenerationSection: {
+    marginBottom: 12,
   },
-  comingSoon: {
-    textAlign: 'center',
-    color: '#6b7280',
-    fontSize: 18,
-    marginTop: 20,
-    fontWeight: '500',
-  },
-  comingSoonSubtitle: {
-    textAlign: 'center',
-    color: '#9ca3af',
+  aiSectionTitle: {
     fontSize: 14,
-    marginTop: 8,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 8,
   },
-  // Profile Styles
-  profileCard: {
+  aiButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  aiGenButton: {
+    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    flex: 1,
+    marginHorizontal: 2,
+    justifyContent: 'center',
+  },
+  aiGenButtonText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  // Generated Content
+  generatedContent: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+  },
+  contentSection: {
+    marginBottom: 12,
+  },
+  contentSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  contentText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  viewContentButton: {
+    backgroundColor: '#5856D6',
+    padding: 8,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  viewContentButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Empty State
+  emptyState: {
+    alignItems: 'center',
+    padding: 40,
     backgroundColor: 'white',
-    padding: 25,
     borderRadius: 12,
     marginBottom: 20,
-    alignItems: 'center',
   },
-  profileInfo: {
-    width: '100%',
-  },
-  profileItem: {
-    fontSize: 16,
-    marginBottom: 12,
-    color: '#374151',
-  },
-  logoutButton: {
-    backgroundColor: '#ef4444',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  logoutButtonText: {
-    color: 'white',
+  emptyStateText: {
+    fontSize: 18,
+    color: '#666',
+    marginTop: 12,
     fontWeight: '600',
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#888',
+    marginTop: 6,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  // Plans Section
+  plansSection: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  subSectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 12,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  pickerButton: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 8,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  pickerButtonText: {
+    fontSize: 14,
+    color: '#1a1a1a',
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  // Calendar
+  calendarSection: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  calendar: {
+    borderRadius: 8,
+  },
+  // Inputs
+  input: {
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 16,
+    backgroundColor: '#f8f9fa',
     fontSize: 16,
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  // Buttons
+  primaryButton: {
+    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 8,
+  },
+  primaryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
     marginLeft: 8,
   },
-  // Modal Styles
+  secondaryButton: {
+    backgroundColor: '#6c757d',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  secondaryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    backgroundColor: '#adb5bd',
+  },
+  // Upload
+  uploadButton: {
+    backgroundColor: '#5856D6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  uploadButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  fileInfo: {
+    backgroundColor: '#f8f9fa',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  fileName: {
+    fontSize: 14,
+    color: '#495057',
+    marginLeft: 8,
+    flex: 1,
+  },
+  // Modal
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 20,
   },
   modalContent: {
     backgroundColor: 'white',
-    padding: 25,
+    padding: 24,
     borderRadius: 16,
-    width: '85%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
+    width: '100%',
+    maxWidth: 400,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
-    color: '#1f2937',
+    color: '#1a1a1a',
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    marginTop: 8,
   },
-  secondaryButton: {
-    backgroundColor: '#6b7280',
-    padding: 15,
-    borderRadius: 8,
-    flex: 1,
-    marginRight: 10,
+  // Profile
+  profileInfo: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  profileAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  profileName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: '#666',
+  },
+  profileStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 24,
+  },
+  statCard: {
     alignItems: 'center',
   },
-  secondaryButtonText: {
-    color: 'white',
-    fontWeight: '600',
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  // Profile Actions
+  profileActions: {
+    marginBottom: 24,
+  },
+  profileActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  profileActionText: {
     fontSize: 16,
+    color: '#1a1a1a',
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+  logoutButton: {
+    borderColor: '#FF3B30',
+  },
+  logoutText: {
+    color: '#FF3B30',
   },
 });

@@ -1,10 +1,81 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, Alert } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Signup({ navigation }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSignup = async () => {
+    // Validation
+    if (!email || !password || !confirmPassword) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      Alert.alert("Error", "Please enter a valid email address");
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert("Error", "Password must be at least 6 characters long");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Check if user already exists
+      const existingUsers = await AsyncStorage.getItem('users');
+      const users = existingUsers ? JSON.parse(existingUsers) : [];
+
+      const userExists = users.find(user => user.email === email);
+      if (userExists) {
+        Alert.alert("Error", "An account with this email already exists");
+        setLoading(false);
+        return;
+      }
+
+      // Create new user
+      const newUser = {
+        id: Date.now().toString(),
+        email: email.toLowerCase().trim(),
+        password: password, // In real app, hash this password
+        createdAt: new Date().toISOString(),
+        lastLogin: new Date().toISOString()
+      };
+
+      // Save user to storage
+      users.push(newUser);
+      await AsyncStorage.setItem('users', JSON.stringify(users));
+
+      // Also store current session
+      await AsyncStorage.setItem('currentUser', JSON.stringify(newUser));
+
+      Alert.alert("Success", "Account created successfully!", [
+        { text: "OK", onPress: () => navigation.navigate("Home") }
+      ]);
+
+    } catch (error) {
+      console.error('Signup error:', error);
+      Alert.alert("Error", "Failed to create account. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   return (
     <View style={styles.container}>
@@ -19,6 +90,8 @@ export default function Signup({ navigation }) {
           placeholderTextColor="#9CA3AF"
           value={email}
           onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
         />
 
         {/* Password Input */}
@@ -43,13 +116,17 @@ export default function Signup({ navigation }) {
 
         {/* Signup Button */}
         <Pressable
-          onPress={() => navigation.navigate("Home")}
+          onPress={handleSignup}
           style={({ pressed }) => [
             styles.button,
-            pressed && styles.buttonPressed
+            pressed && styles.buttonPressed,
+            loading && styles.buttonDisabled
           ]}
+          disabled={loading}
         >
-          <Text style={styles.buttonText}>Create Account</Text>
+          <Text style={styles.buttonText}>
+            {loading ? "Creating Account..." : "Create Account"}
+          </Text>
         </Pressable>
 
         {/* Terms and Conditions */}
@@ -78,15 +155,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#dbeafe", // from-blue-100
-    paddingHorizontal: 24, // px-6
+    backgroundColor: "#dbeafe",
+    paddingHorizontal: 24,
   },
   card: {
-    backgroundColor: "white", // bg-white
-    width: "100%", // w-full
-    maxWidth: 448, // max-w-md (448px) - matching Login component
-    borderRadius: 16, // rounded-2xl
-    shadowColor: "#000", // shadow-2xl
+    backgroundColor: "white",
+    width: "100%",
+    maxWidth: 448,
+    borderRadius: 16,
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 4,
@@ -94,32 +171,32 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
-    padding: 32, // p-8
+    padding: 32,
   },
   title: {
-    fontSize: 36, // text-4xl - matching Login component
-    fontWeight: "800", // font-extrabold
-    textAlign: "center", // text-center
-    color: "#1d4ed8", // text-blue-700
-    marginBottom: 24, // mb-6
+    fontSize: 36,
+    fontWeight: "800",
+    textAlign: "center",
+    color: "#1d4ed8",
+    marginBottom: 24,
   },
   subtitle: {
-    color: "#6b7280", // text-gray-600
-    textAlign: "center", // text-center
-    marginBottom: 32, // mb-8
+    color: "#6b7280",
+    textAlign: "center",
+    marginBottom: 32,
     fontSize: 16,
   },
   input: {
-    width: "100%", // w-full
-    borderWidth: 1, // border
-    borderColor: "#d1d5db", // border-gray-300
-    borderRadius: 12, // rounded-xl
-    paddingHorizontal: 16, // px-4
-    paddingVertical: 12, // py-3
-    marginBottom: 16, // mb-4
-    fontSize: 16, // text-base
-    backgroundColor: "#f9fafb", // bg-gray-50
-    shadowColor: "#000", // shadow-sm
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    fontSize: 16,
+    backgroundColor: "#f9fafb",
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 1,
@@ -129,11 +206,11 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   button: {
-    width: "100%", // w-full
-    backgroundColor: "#2563eb", // bg-blue-600
-    borderRadius: 12, // rounded-xl
-    paddingVertical: 12, // py-3
-    shadowColor: "#000", // shadow-lg
+    width: "100%",
+    backgroundColor: "#2563eb",
+    borderRadius: 12,
+    paddingVertical: 12,
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -143,33 +220,36 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   buttonPressed: {
-    backgroundColor: "#1d4ed8", // active:bg-blue-700
+    backgroundColor: "#1d4ed8",
+  },
+  buttonDisabled: {
+    backgroundColor: "#93c5fd",
   },
   buttonText: {
-    textAlign: "center", // text-center
-    color: "white", // text-white
-    fontWeight: "600", // font-semibold
-    fontSize: 18, // text-lg
-    letterSpacing: 0.5, // tracking-wide
+    textAlign: "center",
+    color: "white",
+    fontWeight: "600",
+    fontSize: 18,
+    letterSpacing: 0.5,
   },
   termsText: {
-    color: "#6b7280", // text-gray-500
-    fontSize: 12, // text-xs
-    textAlign: "center", // text-center
-    marginTop: 12, // mt-3
+    color: "#6b7280",
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 12,
   },
   termsLink: {
-    color: "#2563eb", // text-blue-600
-    textDecorationLine: "underline", // underline
+    color: "#2563eb",
+    textDecorationLine: "underline",
   },
   loginRedirect: {
-    color: "#6b7280", // text-gray-600
-    marginTop: 24, // mt-6
-    textAlign: "center", // text-center
+    color: "#6b7280",
+    marginTop: 24,
+    textAlign: "center",
     fontSize: 16,
   },
   loginLink: {
-    color: "#1d4ed8", // text-blue-700
-    fontWeight: "600", // font-semibold
+    color: "#1d4ed8",
+    fontWeight: "600",
   },
 });
